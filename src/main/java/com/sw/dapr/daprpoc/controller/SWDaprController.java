@@ -16,7 +16,7 @@ public class SWDaprController
     @ResponseBody
     public static ResponseEntity sendName(@RequestBody String body)
     {
-        System.out.println("Hello World");
+        System.out.println("Hello World!");
         return ResponseEntity.ok(HttpStatus.OK);
     }
 }
