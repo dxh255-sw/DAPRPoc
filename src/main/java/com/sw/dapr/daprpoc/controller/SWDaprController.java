@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -79,5 +80,31 @@ public class SWDaprController
         return ResponseEntity.ok(HttpStatus.OK);
     }
 
-}
+    @PostMapping("/dapr/hashicorp/secretBySDK")
+    @ResponseBody
+    public static ResponseEntity showSecretBySDKHashicorp(@RequestBody Map<String, String> secretJson)
+    {
+        System.out.println("Creating DaprClient");
+        DaprClient client = new DaprClientBuilder().build();
+        System.out.println("Attempting to Connect ");
+        System.out.println("vault key is " + secretJson.get("vaultKey"));
+        System.out.println("secret key is " + secretJson.get("secretKey"));
+        Map<String, String> secretValue = client.getSecret(secretJson.get("vaultKey"), secretJson.get("secretKey")).block();
+        System.out.println("Connected ");
+        System.out.println("Fetched Secret: " + secretValue);
+        return ResponseEntity.ok(HttpStatus.OK);
+    }
 
+    @PostMapping("/dapr/hashicorp/secretByURL")
+    @ResponseBody
+    public static ResponseEntity showSecretByURLHashicorp(@RequestBody String body) throws Exception
+    {
+        URI secretStoreURI = new URI("http://localhost:3005/v1.0/secrets/vault/mynewsecret");
+        HttpRequest request = HttpRequest.newBuilder()
+                                         .uri(secretStoreURI)
+                                         .build();
+        HttpResponse response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        System.out.println("Fetched Secret: " + response.body().toString());
+        return ResponseEntity.ok(HttpStatus.OK);
+    }
+}
