@@ -1,6 +1,9 @@
 package com.sw.dapr.daprpoc.controller;
 
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sw.dapr.daprpoc.beans.Root;
+import com.sw.dapr.daprpoc.beans.VaultItem;
 import io.dapr.client.DaprClient;
 import io.dapr.client.DaprClientBuilder;
 import org.springframework.http.HttpStatus;
@@ -16,42 +19,75 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Map;
 
 @RestController
 public class SWDaprController
 {
-
-    private static final HttpClient httpClient = HttpClient.newBuilder()
-                                                           .version(HttpClient.Version.HTTP_2)
-                                                           .connectTimeout(Duration.ofSeconds(10))
-                                                           .build();
-
-
-    @PostMapping("/dapr/local/secretBySDK")
+    @PostMapping("/secrets")
     @ResponseBody
-    public static ResponseEntity showSecretBySDK(@RequestBody String body)
+    public static ResponseEntity findSecrets(@RequestBody Map<String, String> secretJson)
     {
-        System.out.println("Creating DaprClient");
+
+        Root root = new Root();
+
+        System.out.println("Searching vaults for secrets");
+        String secretKey =  secretJson.get("secretKey");
+        System.out.println("Looing for key " + secretKey);
+
+        String hashiCorpVault = "hashicorpvault";
+        String azureKeyVault = "azurekeyvault";
+
         DaprClient client = new DaprClientBuilder().build();
-        System.out.println("Attempting to Connect ");
-        Map<String, String> secret = client.getSecret("localsecretstore", "secret").block();
-        System.out.println("Connected ");
-        System.out.println("Fetched Secret: " + secret);
-        return ResponseEntity.ok(HttpStatus.OK);
+
+        System.out.println("Attempting to Connect to HashiCorp");
+        Map<String, String> hashiCorpSecret = client.getSecret(hashiCorpVault, secretKey).block();
+
+        if(hashiCorpSecret != null && !hashiCorpSecret.isEmpty())
+        {
+            buildJSONReposnse(root, hashiCorpSecret,hashiCorpVault);
+        }
+
+        System.out.println("Attempting to Connect to AzureKey Vault");
+        Map<String, String> azureSecretsecret = client.getSecret(azureKeyVault, secretKey).block();
+
+        if(azureSecretsecret != null && !azureSecretsecret.isEmpty())
+        {
+            buildJSONReposnse(root, azureSecretsecret,azureKeyVault);
+        }
+
+        String jsonResponse = null;
+
+        try
+        {
+            ObjectMapper mapper = new ObjectMapper();
+            jsonResponse = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
+        }
+        catch (Exception e)
+        {
+            System.out.println(e);
+        }
+
+        if(jsonResponse == null)
+        {
+            System.out.println("JSON Response was null");
+            jsonResponse = "{ \"results\": [ }";
+        }
+
+        System.out.println("Returning value");
+        return ResponseEntity.ok(jsonResponse);
     }
 
-    @PostMapping("/dapr/local/secretByURL")
-    @ResponseBody
-    public static ResponseEntity showSecretByURL(@RequestBody String body) throws Exception
+    public static void buildJSONReposnse(Root root,Map<String, String> secretMapResponse, String vault)
     {
-        URI secretStoreURI = new URI("http://localhost:3005/v1.0/secrets/localsecretstore/secret");
-        HttpRequest request = HttpRequest.newBuilder()
-                                         .uri(secretStoreURI)
-                                         .build();
-        HttpResponse response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        System.out.println("Fetched Secret: " + response.body().toString());
-        return ResponseEntity.ok(HttpStatus.OK);
+        for (Map.Entry<String, String> entry : secretMapResponse.entrySet()) {
+            VaultItem item = new VaultItem();
+            item.setVault(vault);
+            item.setKey(entry.getKey());
+            item.setPassword(entry.getValue());
+            root.getResults().add(item);
+        }
     }
 
     @PostMapping("/dapr/azure/secretBySDK")
@@ -64,19 +100,6 @@ public class SWDaprController
         Map<String, String> secret = client.getSecret("azurekeyvault", "HEARS-DB-URL").block();
         System.out.println("Connected ");
         System.out.println("Fetched Secret: " + secret);
-        return ResponseEntity.ok(HttpStatus.OK);
-    }
-
-    @PostMapping("/dapr/azure/secretByURL")
-    @ResponseBody
-    public static ResponseEntity showSecretByURLAzure(@RequestBody String body) throws Exception
-    {
-        URI secretStoreURI = new URI("http://localhost:3005/v1.0/secrets/azurekeyvault/HEARS-DB-URL");
-        HttpRequest request = HttpRequest.newBuilder()
-                                         .uri(secretStoreURI)
-                                         .build();
-        HttpResponse response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        System.out.println("Fetched Secret: " + response.body().toString());
         return ResponseEntity.ok(HttpStatus.OK);
     }
 
@@ -95,16 +118,4 @@ public class SWDaprController
         return ResponseEntity.ok(HttpStatus.OK);
     }
 
-    @PostMapping("/dapr/hashicorp/secretByURL")
-    @ResponseBody
-    public static ResponseEntity showSecretByURLHashicorp(@RequestBody String body) throws Exception
-    {
-        URI secretStoreURI = new URI("http://localhost:3005/v1.0/secrets/vault/mynewsecret");
-        HttpRequest request = HttpRequest.newBuilder()
-                                         .uri(secretStoreURI)
-                                         .build();
-        HttpResponse response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        System.out.println("Fetched Secret: " + response.body().toString());
-        return ResponseEntity.ok(HttpStatus.OK);
-    }
 }
