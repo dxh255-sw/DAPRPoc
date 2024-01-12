@@ -8,18 +8,9 @@ import io.dapr.client.DaprClient;
 import io.dapr.client.DaprClientBuilder;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Mono;
+import org.springframework.web.bind.annotation.*;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 
 @RestController
@@ -29,7 +20,6 @@ public class SWDaprController
     @ResponseBody
     public static ResponseEntity findSecrets(@RequestBody Map<String, String> secretJson)
     {
-
         Root root = new Root();
 
         System.out.println("Searching vaults for secrets");
@@ -42,19 +32,34 @@ public class SWDaprController
         DaprClient client = new DaprClientBuilder().build();
 
         System.out.println("Attempting to Connect to HashiCorp");
-        Map<String, String> hashiCorpSecret = client.getSecret(hashiCorpVault, secretKey).block();
-
-        if(hashiCorpSecret != null && !hashiCorpSecret.isEmpty())
+        try
         {
-            buildJSONReposnse(root, hashiCorpSecret,hashiCorpVault);
+            Map<String, String> hashiCorpSecret = client.getSecret(hashiCorpVault, secretKey).block();
+
+            if(hashiCorpSecret != null && !hashiCorpSecret.isEmpty())
+            {
+                buildJSONReposnse(root, hashiCorpSecret,hashiCorpVault);
+            }
+        }
+        catch (Exception e)
+        {
+            System.out.println(e);
         }
 
-        System.out.println("Attempting to Connect to AzureKey Vault");
-        Map<String, String> azureSecretsecret = client.getSecret(azureKeyVault, secretKey).block();
 
-        if(azureSecretsecret != null && !azureSecretsecret.isEmpty())
+        System.out.println("Attempting to Connect to AzureKey Vault");
+        try
         {
-            buildJSONReposnse(root, azureSecretsecret,azureKeyVault);
+            Map<String, String> azureSecretsecret = client.getSecret(azureKeyVault, secretKey).block();
+
+            if(azureSecretsecret != null && !azureSecretsecret.isEmpty())
+            {
+                buildJSONReposnse(root, azureSecretsecret,azureKeyVault);
+            }
+        }
+            catch (Exception e)
+        {
+            System.out.println(e);
         }
 
         String jsonResponse = null;
@@ -118,4 +123,8 @@ public class SWDaprController
         return ResponseEntity.ok(HttpStatus.OK);
     }
 
+    @GetMapping("/showHeaders")
+    public void showHeaders(@RequestHeader Map<String, String> headers) {
+        headers.forEach((key, value) -> System.out.println(key + ": " + value));
+    }
 }
